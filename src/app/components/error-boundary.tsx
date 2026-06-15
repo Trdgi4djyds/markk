@@ -10,7 +10,8 @@ export function RouteErrorBoundary() {
     : error instanceof Error
       ? error.message
       : "Une erreur inattendue est survenue";
-  const stack = error instanceof Error ? error.stack : "";
+  const isDev = import.meta.env.DEV;
+  const stack = isDev && error instanceof Error ? error.stack : "";
   // eslint-disable-next-line no-console
   console.error("[IPPOO ErrorBoundary]", error);
 
