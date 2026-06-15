@@ -655,3 +655,124 @@ INSERT INTO ippoo_market_ref_categories (id, parent_id, name) VALUES ('artisanat
 INSERT INTO ippoo_market_ref_categories (id, parent_id, name) VALUES ('artisanat-produits-naturels', 'artisanat', 'Produits naturels');
 INSERT INTO ippoo_market_ref_categories (id, parent_id, name) VALUES ('artisanat-cosm-tiques-locaux', 'artisanat', 'Cosmétiques locaux');
 INSERT INTO ippoo_market_ref_categories (id, parent_id, name) VALUES ('artisanat-aliments-locaux', 'artisanat', 'Aliments locaux');
+
+-- 6. Profiles
+CREATE TABLE IF NOT EXISTS ippoo_market_profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT UNIQUE NOT NULL,
+    full_name TEXT,
+    avatar_url TEXT,
+    phone TEXT,
+    preferred_language TEXT DEFAULT 'fr',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 7. Vendors
+CREATE TABLE IF NOT EXISTS ippoo_market_vendors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    city TEXT,
+    rating DECIMAL(3,2) DEFAULT 0,
+    verified BOOLEAN DEFAULT FALSE,
+    joined_year TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 8. Shops
+CREATE TABLE IF NOT EXISTS ippoo_market_shops (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID NOT NULL REFERENCES ippoo_market_vendors(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    niche_id TEXT REFERENCES ippoo_market_ref_categories(id),
+    city TEXT,
+    rating DECIMAL(3,2) DEFAULT 0,
+    verified BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 9. Products
+CREATE TABLE IF NOT EXISTS ippoo_market_products (
+    id SERIAL PRIMARY KEY,
+    shop_id UUID NOT NULL REFERENCES ippoo_market_shops(id) ON DELETE CASCADE,
+    vendor_id UUID NOT NULL REFERENCES ippoo_market_vendors(id) ON DELETE CASCADE,
+    category_id TEXT REFERENCES ippoo_market_ref_categories(id),
+    name TEXT NOT NULL,
+    description TEXT,
+    image_url TEXT,
+    price INTEGER NOT NULL, -- Price in smallest unit (e.g. FCFA)
+    moq INTEGER DEFAULT 1,
+    unit TEXT DEFAULT 'pièce',
+    rating DECIMAL(3,2) DEFAULT 0,
+    stock_qty INTEGER DEFAULT 0,
+    in_stock BOOLEAN DEFAULT TRUE,
+    paliers JSONB, -- Array of {qty, price}
+    metadata JSONB, -- color, size, brand, weightKg, etc.
+    reference TEXT UNIQUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 10. Orders
+CREATE TABLE IF NOT EXISTS ippoo_market_orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    shipping_address JSONB NOT NULL,
+    payment_method TEXT NOT NULL,
+    total_amount INTEGER NOT NULL,
+    commission_amount INTEGER DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending',
+    escrow_status TEXT NOT NULL DEFAULT 'n/a',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 11. Order Items
+CREATE TABLE IF NOT EXISTS ippoo_market_order_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL REFERENCES ippoo_market_orders(id) ON DELETE CASCADE,
+    product_id INTEGER REFERENCES ippoo_market_products(id) ON DELETE SET NULL,
+    vendor_id UUID REFERENCES ippoo_market_vendors(id),
+    title TEXT NOT NULL,
+    unit_price INTEGER NOT NULL,
+    qty INTEGER NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 12. User KV replacements (Specific tables for high-value data)
+CREATE TABLE IF NOT EXISTS ippoo_market_user_addresses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    city TEXT NOT NULL,
+    line1 TEXT NOT NULL,
+    line2 TEXT,
+    is_default BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS Policies (Basic setup)
+ALTER TABLE ippoo_market_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_vendors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_shops ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_user_addresses ENABLE ROW LEVEL SECURITY;
+
+-- Profiles: Users can read and update their own profile
+CREATE POLICY "Users can view own profile" ON ippoo_market_profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON ippoo_market_profiles FOR UPDATE USING (auth.uid() = id);
+
+-- Orders: Users can view their own orders
+CREATE POLICY "Users can view own orders" ON ippoo_market_orders FOR SELECT USING (auth.uid() = user_id);
+
+-- Addresses: Users can manage their own addresses
+CREATE POLICY "Users can manage own addresses" ON ippoo_market_user_addresses FOR ALL USING (auth.uid() = user_id);
+
+-- Products: Everyone can read products
+CREATE POLICY "Anyone can view products" ON ippoo_market_products FOR SELECT USING (TRUE);
