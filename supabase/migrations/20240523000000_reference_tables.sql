@@ -664,6 +664,7 @@ CREATE TABLE IF NOT EXISTS ippoo_market_profiles (
     avatar_url TEXT,
     phone TEXT,
     preferred_language TEXT DEFAULT 'fr',
+    metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -776,3 +777,247 @@ CREATE POLICY "Users can manage own addresses" ON ippoo_market_user_addresses FO
 
 -- Products: Everyone can read products
 CREATE POLICY "Anyone can view products" ON ippoo_market_products FOR SELECT USING (TRUE);
+
+
+-- 13. Groups (Group Buying)
+CREATE TABLE IF NOT EXISTS ippoo_market_groups (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    product TEXT NOT NULL,
+    organizer_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    price_normal INTEGER,
+    target_qty INTEGER,
+    max_participants INTEGER,
+    expires_at TIMESTAMPTZ,
+    status TEXT DEFAULT 'open',
+    participants JSONB DEFAULT '[]', -- Array of participant objects
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 14. Devis (Request For Quote)
+CREATE TABLE IF NOT EXISTS ippoo_market_devis (
+    id TEXT PRIMARY KEY,
+    buyer_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    products JSONB NOT NULL, -- Array of products
+    target_vendor_ids UUID[] NOT NULL,
+    deadline TEXT,
+    location TEXT,
+    notes TEXT,
+    status TEXT DEFAULT 'open',
+    accepted_response_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS ippoo_market_devis_responses (
+    id TEXT PRIMARY KEY,
+    devis_id TEXT NOT NULL REFERENCES ippoo_market_devis(id) ON DELETE CASCADE,
+    vendor_id UUID NOT NULL REFERENCES ippoo_market_vendors(id) ON DELETE CASCADE,
+    vendor_name TEXT,
+    price INTEGER NOT NULL,
+    lead_time TEXT,
+    notes TEXT,
+    items JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 15. Wallet
+CREATE TABLE IF NOT EXISTS ippoo_market_wallets (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    balance INTEGER DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS ippoo_market_wallet_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    amount INTEGER NOT NULL,
+    reason TEXT,
+    meta JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 16. KYC
+CREATE TABLE IF NOT EXISTS ippoo_market_kyc (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    status TEXT DEFAULT 'pending',
+    reason TEXT,
+    decided_at TIMESTAMPTZ,
+    decided_by UUID REFERENCES auth.users(id),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 17. Push Subscriptions
+CREATE TABLE IF NOT EXISTS ippoo_market_push_subscriptions (
+    endpoint TEXT PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    expiration_time BIGINT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 18. Audit Logs
+CREATE TABLE IF NOT EXISTS ippoo_market_audit_logs (
+    id TEXT PRIMARY KEY,
+    ts BIGINT NOT NULL,
+    admin_id UUID REFERENCES auth.users(id),
+    admin_email TEXT,
+    action TEXT NOT NULL,
+    meta JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 19. Payouts
+CREATE TABLE IF NOT EXISTS ippoo_market_payouts (
+    id TEXT PRIMARY KEY,
+    vendor_id UUID NOT NULL REFERENCES ippoo_market_vendors(id) ON DELETE CASCADE,
+    vendor_name TEXT,
+    amount INTEGER NOT NULL,
+    method TEXT DEFAULT 'mobile_money',
+    status TEXT DEFAULT 'pending',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 20. Reviews
+CREATE TABLE IF NOT EXISTS ippoo_market_reviews (
+    id TEXT PRIMARY KEY,
+    target_type TEXT NOT NULL, -- 'product' or 'shop'
+    target_id TEXT NOT NULL,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_email TEXT,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT,
+    status TEXT DEFAULT 'active',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 21. Subscriptions & Plans
+CREATE TABLE IF NOT EXISTS ippoo_market_plans (
+    id TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    price_monthly INTEGER NOT NULL,
+    price_yearly INTEGER NOT NULL,
+    features TEXT[],
+    active BOOLEAN DEFAULT TRUE,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS ippoo_market_subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    plan_id TEXT NOT NULL REFERENCES ippoo_market_plans(id),
+    status TEXT NOT NULL,
+    current_period_end TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 22. Messaging
+CREATE TABLE IF NOT EXISTS ippoo_market_conversations (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    avatar TEXT,
+    last_message TEXT,
+    last_ts BIGINT,
+    last_sender_id UUID,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS ippoo_market_conversation_participants (
+    conversation_id TEXT NOT NULL REFERENCES ippoo_market_conversations(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    last_read_at BIGINT DEFAULT 0,
+    PRIMARY KEY (conversation_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS ippoo_market_messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES ippoo_market_conversations(id) ON DELETE CASCADE,
+    sender_id UUID NOT NULL REFERENCES auth.users(id),
+    sender_email TEXT,
+    type TEXT DEFAULT 'text',
+    text TEXT,
+    attachment JSONB,
+    ts BIGINT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 23. Promos
+CREATE TABLE IF NOT EXISTS ippoo_market_promos (
+    code TEXT PRIMARY KEY,
+    label TEXT,
+    type TEXT NOT NULL, -- 'amount' or 'percent'
+    value INTEGER NOT NULL,
+    min_amount INTEGER DEFAULT 0,
+    max_uses INTEGER,
+    uses INTEGER DEFAULT 0,
+    active BOOLEAN DEFAULT TRUE,
+    expires_at BIGINT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 24. Support Tickets
+CREATE TABLE IF NOT EXISTS ippoo_market_tickets (
+    id TEXT PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_email TEXT,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    category TEXT DEFAULT 'general',
+    priority TEXT DEFAULT 'normal',
+    status TEXT DEFAULT 'open',
+    replies JSONB DEFAULT '[]', -- Array of reply objects
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- More RLS Policies
+ALTER TABLE ippoo_market_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_devis ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_devis_responses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_wallets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_wallet_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_kyc ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_push_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_payouts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_plans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_conversation_participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_promos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ippoo_market_tickets ENABLE ROW LEVEL SECURITY;
+
+-- Basic Policies (Admin and Owner access usually)
+CREATE POLICY "Users can manage own groups" ON ippoo_market_groups FOR ALL USING (auth.uid() = organizer_id);
+CREATE POLICY "Anyone can view groups" ON ippoo_market_groups FOR SELECT USING (TRUE);
+
+CREATE POLICY "Users can manage own devis" ON ippoo_market_devis FOR ALL USING (auth.uid() = buyer_id);
+CREATE POLICY "Vendors can view devis" ON ippoo_market_devis FOR SELECT USING (auth.uid() = ANY(target_vendor_ids));
+
+CREATE POLICY "Users can view own wallet" ON ippoo_market_wallets FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own wallet txs" ON ippoo_market_wallet_transactions FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own kyc" ON ippoo_market_kyc FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can manage own push subs" ON ippoo_market_push_subscriptions FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own conversation participants" ON ippoo_market_conversation_participants FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can view messages in their conversations" ON ippoo_market_messages FOR SELECT USING (
+    EXISTS (
+        SELECT 1 FROM ippoo_market_conversation_participants
+        WHERE conversation_id = ippoo_market_messages.conversation_id AND user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Anyone can view active plans" ON ippoo_market_plans FOR SELECT USING (active = TRUE);
+
+
+-- Allow admins to view all profiles (simplified check for this migration)
+-- In production, you'd check a role or a specific admin table/metadata
+CREATE POLICY "Admins can view all profiles" ON ippoo_market_profiles FOR SELECT USING (TRUE);
