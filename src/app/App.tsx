@@ -36,12 +36,14 @@ export default function App() {
     installNativeMeta();
     installNotificationSoundBridge();
     const onErr = (e: ErrorEvent) => {
+      const isDev = import.meta.env.DEV;
       // eslint-disable-next-line no-console
-      console.error("[IPPOO window.error]", e.message, e.error?.stack);
+      console.error("[IPPOO window.error]", e.message, isDev ? e.error?.stack : "");
     };
     const onRej = (e: PromiseRejectionEvent) => {
+      const isDev = import.meta.env.DEV;
       // eslint-disable-next-line no-console
-      console.error("[IPPOO unhandledrejection]", e.reason);
+      console.error("[IPPOO unhandledrejection]", isDev ? e.reason : "Unhandled promise rejection");
     };
     window.addEventListener("error", onErr);
     window.addEventListener("unhandledrejection", onRej);

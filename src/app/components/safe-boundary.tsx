@@ -55,6 +55,11 @@ export class SafeBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.error) {
+      const isDev = import.meta.env.DEV;
+      const errorDetail = isDev
+        ? (this.state.error?.stack || this.state.error?.message || String(this.state.error))
+        : (this.state.error?.message || "Une erreur inattendue est survenue");
+
       return (
         <div style={{ padding: 24, fontFamily: "system-ui, sans-serif", color: "#111" }}>
           <h1 style={{ fontSize: 18, marginBottom: 8 }}>Une erreur est survenue</h1>
@@ -72,7 +77,7 @@ export class SafeBoundary extends Component<Props, State> {
               overflow: "auto",
             }}
           >
-            {String(this.state.error?.stack || this.state.error?.message || this.state.error)}
+            {errorDetail}
           </pre>
           <button
             type="button"
