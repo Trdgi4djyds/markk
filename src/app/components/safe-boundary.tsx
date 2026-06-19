@@ -58,22 +58,24 @@ export class SafeBoundary extends Component<Props, State> {
       return (
         <div style={{ padding: 24, fontFamily: "system-ui, sans-serif", color: "#111" }}>
           <h1 style={{ fontSize: 18, marginBottom: 8 }}>Une erreur est survenue</h1>
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-              background: "#FEF2F2",
-              border: "1px solid #FCA5A5",
-              borderRadius: 8,
-              padding: 12,
-              fontSize: 12,
-              color: "#7F1D1D",
-              maxHeight: 280,
-              overflow: "auto",
-            }}
-          >
-            {String(this.state.error?.stack || this.state.error?.message || this.state.error)}
-          </pre>
+          {import.meta.env.DEV && (
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                background: "#FEF2F2",
+                border: "1px solid #FCA5A5",
+                borderRadius: 8,
+                padding: 12,
+                fontSize: 12,
+                color: "#7F1D1D",
+                maxHeight: 280,
+                overflow: "auto",
+              }}
+            >
+              {String(this.state.error?.stack || this.state.error?.message || this.state.error)}
+            </pre>
+          )}
           <button
             type="button"
             onClick={this.handleReset}
