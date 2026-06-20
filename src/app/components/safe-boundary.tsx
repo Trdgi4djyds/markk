@@ -54,26 +54,34 @@ export class SafeBoundary extends Component<Props, State> {
   };
 
   render() {
+    const isDev = import.meta.env.DEV;
     if (this.state.error) {
       return (
         <div style={{ padding: 24, fontFamily: "system-ui, sans-serif", color: "#111" }}>
           <h1 style={{ fontSize: 18, marginBottom: 8 }}>Une erreur est survenue</h1>
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-              background: "#FEF2F2",
-              border: "1px solid #FCA5A5",
-              borderRadius: 8,
-              padding: 12,
-              fontSize: 12,
-              color: "#7F1D1D",
-              maxHeight: 280,
-              overflow: "auto",
-            }}
-          >
-            {String(this.state.error?.stack || this.state.error?.message || this.state.error)}
-          </pre>
+          {isDev && (
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                background: "#FEF2F2",
+                border: "1px solid #FCA5A5",
+                borderRadius: 8,
+                padding: 12,
+                fontSize: 12,
+                color: "#7F1D1D",
+                maxHeight: 280,
+                overflow: "auto",
+              }}
+            >
+              {String(this.state.error?.stack || this.state.error?.message || this.state.error)}
+            </pre>
+          )}
+          {!isDev && (
+            <p style={{ fontSize: 14, color: "#444" }}>
+              Désolé, une erreur technique est survenue. Veuillez réessayer.
+            </p>
+          )}
           <button
             type="button"
             onClick={this.handleReset}
