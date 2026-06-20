@@ -5,12 +5,14 @@ export function RouteErrorBoundary() {
   const error = useRouteError() as unknown;
   const navigate = useNavigate();
 
+  const isDev = import.meta.env.DEV;
   const message = isRouteErrorResponse(error)
     ? `${error.status} ${error.statusText}`
     : error instanceof Error
-      ? error.message
+      ? (isDev ? error.message : "Une erreur technique est survenue")
       : "Une erreur inattendue est survenue";
   const stack = error instanceof Error ? error.stack : "";
+
   // eslint-disable-next-line no-console
   console.error("[IPPOO ErrorBoundary]", error);
 
@@ -29,7 +31,7 @@ export function RouteErrorBoundary() {
         <p className="text-muted-foreground mb-2" style={{ fontSize: 12 }}>
           {message}
         </p>
-        {stack && (
+        {isDev && stack && (
           <pre className="text-muted-foreground mb-3 max-h-48 overflow-auto bg-muted/40 rounded-lg p-2" style={{ fontSize: 10, whiteSpace: "pre-wrap" }}>
             {stack}
           </pre>
