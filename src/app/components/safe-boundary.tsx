@@ -72,7 +72,9 @@ export class SafeBoundary extends Component<Props, State> {
               overflow: "auto",
             }}
           >
-            {String(this.state.error?.stack || this.state.error?.message || this.state.error)}
+            {import.meta.env.DEV
+              ? String(this.state.error?.stack || this.state.error?.message || this.state.error)
+              : "Une erreur technique est survenue."}
           </pre>
           <button
             type="button"
