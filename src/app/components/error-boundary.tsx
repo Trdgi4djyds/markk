@@ -27,9 +27,11 @@ export function RouteErrorBoundary() {
           </div>
         </div>
         <p className="text-muted-foreground mb-2" style={{ fontSize: 12 }}>
-          {message}
+          {import.meta.env.DEV
+            ? message
+            : "Une erreur est survenue sur IPPOO Market. Veuillez réessayer plus tard."}
         </p>
-        {stack && (
+        {import.meta.env.DEV && stack && (
           <pre className="text-muted-foreground mb-3 max-h-48 overflow-auto bg-muted/40 rounded-lg p-2" style={{ fontSize: 10, whiteSpace: "pre-wrap" }}>
             {stack}
           </pre>
